@@ -11,3 +11,11 @@ def build_agent(env_info, **kwargs):
     """
 
     raise NotImplementedError
+
+
+def test_function(x):
+    if x < 5:
+        print(x)
+    else:
+        print("?")
+    return x
