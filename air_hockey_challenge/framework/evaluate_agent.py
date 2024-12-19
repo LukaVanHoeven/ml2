@@ -2,6 +2,7 @@ import datetime
 import gc
 import json
 import os
+import platform
 from collections import defaultdict
 
 import numpy as np
@@ -175,7 +176,10 @@ def evaluate(agent_builder, log_dir, env_list, n_episodes=1080, n_cores=-1, seed
         with open(os.path.join(path, "results.json"), 'w') as f:
             json.dump(results, f, indent=4, default=convert)
 
-        os.system("chmod -R 777 {}".format(log_dir))
+        if platform.system() != "Windows":
+            os.system("chmod -R 777 {}".format(log_dir))
+            
+        
 
 
 def _evaluate(log_dir, env, agent_builder, init_states, quiet, render, episode_offset, seed, i, interpolation_order, **kwargs):
