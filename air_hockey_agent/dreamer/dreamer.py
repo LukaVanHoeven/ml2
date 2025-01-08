@@ -4,7 +4,7 @@ import os
 import pathlib
 import sys
 
-os.environ["MUJOCO_GL"] = "osmesa"
+#os.environ["MUJOCO_GL"] = "osmesa"
 
 import numpy as np
 import ruamel.yaml as yaml
@@ -16,6 +16,17 @@ import models
 import tools
 import envs.wrappers as wrappers
 from parallel import Parallel, Damy
+
+import threading
+import time
+
+import numpy as np
+from scipy.interpolate import CubicSpline
+
+from air_hockey_challenge.framework.agent_base import AgentBase
+from air_hockey_challenge.utils import inverse_kinematics, world_to_robot
+from baseline.baseline_agent import BezierPlanner, TrajectoryOptimizer, PuckTracker
+
 
 import torch
 from torch import nn
@@ -193,6 +204,18 @@ def make_env(config, mode, id):
 
         env = minecraft.make_env(task, size=config.size, break_speed=config.break_speed)
         env = wrappers.OneHotAction(env)
+    elif suite == "airhockey":
+        #from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
+        from air_hockey_agent.air_hockey_challenge_dreamer_wrapper import AirHockeyChallengeDreamerWrapper
+        env = AirHockeyChallengeDreamerWrapper(env="3dof-hit", interpolation_order=3, debug=False)
+        #env = wrappers.OneHotAction(env)
+
+        #obs = env.reset()
+        #print("Observation space:", env.observation_space)
+        #print("Action space:", env.action_space)
+
+        #env = wrappers.NormalizeActions(env)
+        print("JippieJaJee")
     else:
         raise NotImplementedError(suite)
     env = wrappers.TimeLimit(env, config.time_limit)
@@ -343,10 +366,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", nargs="+")
     args, remaining = parser.parse_known_args()
+    yamlObject = yaml.YAML(typ='safe', pure=True)
+    configs = yamlObject.load((pathlib.Path(sys.argv[0]).parent / "configs.yaml").read_text())
+    """
     configs = yaml.safe_load(
         (pathlib.Path(sys.argv[0]).parent / "configs.yaml").read_text()
     )
-
+    """
     def recursive_update(base, update):
         for key, value in update.items():
             if isinstance(value, dict) and key in base:

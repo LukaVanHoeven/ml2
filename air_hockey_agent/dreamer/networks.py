@@ -92,7 +92,7 @@ class RSSM(nn.Module):
 
         if self._initial == "learned":
             self.W = torch.nn.Parameter(
-                torch.zeros((1, self._deter), device=torch.device(self._device)),
+                torch.zeros((1, self._deter), device=torch.device("cpu")),#self._device)), #change back to cuda when on gpu
                 requires_grad=True,
             )
 
@@ -603,7 +603,7 @@ class MLP(nn.Module):
         unimix_ratio=0.01,
         outscale=1.0,
         symlog_inputs=False,
-        device="cuda",
+        device="cuda", #change back to cuda when on gpu
         name="NoName",
     ):
         super(MLP, self).__init__()
@@ -612,14 +612,14 @@ class MLP(nn.Module):
             self._shape = (1,)
         act = getattr(torch.nn, act)
         self._dist = dist
-        self._std = std if isinstance(std, str) else torch.tensor((std,), device=device)
+        self._std = std if isinstance(std, str) else torch.tensor((std,), device=device) #change back to cuda when on gpu
         self._min_std = min_std
         self._max_std = max_std
         self._absmax = absmax
         self._temp = temp
         self._unimix_ratio = unimix_ratio
         self._symlog_inputs = symlog_inputs
-        self._device = device
+        self._device = device #change back to cuda when on gpu
 
         self.layers = nn.Sequential()
         for i in range(layers):
