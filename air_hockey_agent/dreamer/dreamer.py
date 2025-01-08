@@ -7,14 +7,14 @@ import sys
 os.environ["MUJOCO_GL"] = "osmesa"
 
 import numpy as np
-import ruamel.yaml as yaml
+import yaml as yaml
 
 sys.path.append(str(pathlib.Path(__file__).parent))
 
 import exploration as expl
 import models
 import tools
-import envs.wrappers as wrappers
+import envs.wrappers as wrappers #Dit snapt ie niet, maar dit is ook op de github van dreamer-torch allemaal files met games, mincraft en atari enzo
 from parallel import Parallel, Damy
 
 import torch
@@ -30,6 +30,7 @@ class Dreamer(nn.Module):
         super(Dreamer, self).__init__()
         self._config = config
         self._logger = logger
+        print(config)
         self._should_log = tools.Every(config.log_every)
         batch_steps = config.batch_size * config.batch_length
         self._should_train = tools.Every(batch_steps / config.train_ratio)
@@ -145,54 +146,14 @@ def make_dataset(episodes, config):
 
 def make_env(config, mode, id):
     suite, task = config.task.split("_", 1)
-    if suite == "dmc":
-        import envs.dmc as dmc
-
-        env = dmc.DeepMindControl(
-            task, config.action_repeat, config.size, seed=config.seed + id
-        )
-        env = wrappers.NormalizeActions(env)
-    elif suite == "atari":
-        import envs.atari as atari
-
-        env = atari.Atari(
+    if suite == "airhockey":
+        import envs.air_hockey as air_hockey
+        env = air_hockey.AirHockey(
             task,
             config.action_repeat,
             config.size,
-            gray=config.grayscale,
-            noops=config.noops,
-            lives=config.lives,
-            sticky=config.stickey,
-            actions=config.actions,
-            resize=config.resize,
-            seed=config.seed + id,
+            seed=config.seed + id
         )
-        env = wrappers.OneHotAction(env)
-    elif suite == "dmlab":
-        import envs.dmlab as dmlab
-
-        env = dmlab.DeepMindLabyrinth(
-            task,
-            mode if "train" in mode else "test",
-            config.action_repeat,
-            seed=config.seed + id,
-        )
-        env = wrappers.OneHotAction(env)
-    elif suite == "memorymaze":
-        from envs.memorymaze import MemoryMaze
-
-        env = MemoryMaze(task, seed=config.seed + id)
-        env = wrappers.OneHotAction(env)
-    elif suite == "crafter":
-        import envs.crafter as crafter
-
-        env = crafter.Crafter(task, config.size, seed=config.seed + id)
-        env = wrappers.OneHotAction(env)
-    elif suite == "minecraft":
-        import envs.minecraft as minecraft
-
-        env = minecraft.make_env(task, size=config.size, break_speed=config.break_speed)
-        env = wrappers.OneHotAction(env)
     else:
         raise NotImplementedError(suite)
     env = wrappers.TimeLimit(env, config.time_limit)
