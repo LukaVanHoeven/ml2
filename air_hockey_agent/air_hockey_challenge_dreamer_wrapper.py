@@ -11,7 +11,6 @@ class AirHockeyChallengeDreamerWrapper(AirHockeyChallengeWrapper):
         return gym.spaces.Dict({"image": observation_box})
 
 
-
     @property
     def action_space(self):
         # The desired XY position of the mallet
