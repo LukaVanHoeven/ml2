@@ -7,6 +7,7 @@ import pathlib
 import re
 import time
 import random
+import json
 
 import numpy as np
 
@@ -168,9 +169,16 @@ def simulate(
         obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
         action, agent_state = agent(obs, done, agent_state)
         if isinstance(action, dict):
+            """
             action = [
                 {k: np.array(action[k][i].detach().cpu()) for k in action}
                 for i in range(len(envs))
+            ]
+            """
+            action = [
+                {k: np.array(v.detach().cpu()) if isinstance(v, torch.Tensor) else v
+                for k, v in action.items()}
+                for _ in range(len(envs))
             ]
         else:
             action = np.array(action)
@@ -206,6 +214,7 @@ def simulate(
                 save_episodes(directory, {envs[i].id: cache[envs[i].id]})
                 length = len(cache[envs[i].id]["reward"]) - 1
                 score = float(np.array(cache[envs[i].id]["reward"]).sum())
+                newCache = tuple(cache.items())
                 video = cache[envs[i].id]["image"]
                 # record logs given from environments
                 for key in list(cache[envs[i].id].keys()):

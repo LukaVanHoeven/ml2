@@ -13,7 +13,7 @@ defaults:
   eval_episode_num: 10
   log_every: 1e4
   reset_every: 0
-  device: 'cuda:0' #change back to "cuda:0" when on gpu
+  device: 'cpu' #change back to "cuda:0" when on gpu
   compile: True
   precision: 32
   debug: False
@@ -21,7 +21,7 @@ defaults:
 
   # Environment
   task: 'airhockey_hit'
-  size: [64, 64]
+  #size: [64, 64]
   envs: 1
   action_repeat: 2
   time_limit: 1000
@@ -123,7 +123,7 @@ dmc_walker:
 
 airhockey:
   task: 'airhockey_hit'
-  size: [64, 64]
+  #size: [64, 64]
   envs: 1
   action_repeat: 2
   time_limit: 1000

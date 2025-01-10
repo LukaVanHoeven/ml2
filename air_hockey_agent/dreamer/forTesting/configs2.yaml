@@ -78,3 +78,12 @@ defaults:
   expl_until: 10000
   expl_extr_scale: 0.0
   expl_intr_scale: 1.0
+
+airhockey:
+  # Environment
+  task: 'airhockey_hit'
+  envs: 1
+  action_repeat: 2
+  time_limit: 1000
+  prefill: 2500
+  size: null  # Not relevant since your observations are numerical data
