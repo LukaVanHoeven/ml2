@@ -42,6 +42,7 @@ class myTestAgent(AgentBase):
         self.new_start = True
         self.new_position = None
         self.episode = 1
+        self.i = 0
         
         # Available Environments [3dof, 3dof-hit, 3dof-defend],
         # [7dof, 7dof-hit, 7dof-defend, 7dof-prepare, tournament] will be released at the beginning of
@@ -65,9 +66,9 @@ class myTestAgent(AgentBase):
         self.new_position = None
 
     def draw_action(self, observation):
-  
+        
         if self.new_start:
-            self.new_start = False          
+            self.new_start = False       
             
             # TODO: Currently working on getting the mallet to the puck
             puck_pos = self.get_puck_pos(observation)
@@ -145,7 +146,8 @@ class myTestAgent(AgentBase):
                 # self.new_position = target_position # Start position of the robot
                 # self.new_position = self.get_joint_pos(observation)
                 
-            self.episode += 1            
+            self.episode += 1
+            print(self.episode)      
             
             # print("\n newPos", self.new_position)
             # print("Joint pos", self.get_joint_pos(observation))
@@ -161,9 +163,14 @@ class myTestAgent(AgentBase):
 
         velocity = np.zeros_like(self.new_position)
         action = np.vstack([self.new_position, velocity])
+        
+        if self.i < 5:
+            print(self.i, "action", action)
+            self.i += 1
+            
+        # print("action", action)
 
-        return action
-    
+        return action   
      
 # class StaticDummyAgent(AgentBase):
 #     def __init__(self, env_info, **kwargs):
