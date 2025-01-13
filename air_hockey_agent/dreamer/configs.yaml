@@ -21,7 +21,7 @@ defaults:
 
   # Environment
   task: 'airhockey_hit'
-  #size: [64, 64]
+  size: [64, 64]
   envs: 1
   action_repeat: 2
   time_limit: 1000
@@ -123,7 +123,9 @@ dmc_walker:
 
 airhockey:
   task: 'airhockey_hit'
-  #size: [64, 64]
+  size: [64, 64]
+  encoder: {mlp_keys: '.*', cnn_keys: '$^', act: 'ReLU', norm: True, mlp_layers: 2, mlp_units: 32}
+  decoder: {mlp_keys: '.*', cnn_keys: '$^', act: 'ReLU', norm: True, mlp_layers: 2, mlp_units: 32}
   envs: 1
   action_repeat: 2
   time_limit: 1000

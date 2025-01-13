@@ -603,7 +603,7 @@ class MLP(nn.Module):
         unimix_ratio=0.01,
         outscale=1.0,
         symlog_inputs=False,
-        device="cuda", #change back to cuda when on gpu
+        device="cpu", #change back to cuda when on gpu
         name="NoName",
     ):
         super(MLP, self).__init__()
