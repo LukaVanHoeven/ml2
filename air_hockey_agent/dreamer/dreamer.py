@@ -3,26 +3,19 @@ import functools
 import os
 import pathlib
 import sys
-
-os.environ["MUJOCO_GL"] = "osmesa"
-
 import numpy as np
 import yaml as yaml
-
-sys.path.append(str(pathlib.Path(__file__).parent))
-
 import exploration as expl
 import models
 import tools
-import envs.wrappers as wrappers #Dit snapt ie niet, maar dit is ook op de github van dreamer-torch allemaal files met games, mincraft en atari enzo
+import envs.wrappers as wrappers
 from parallel import Parallel, Damy
-
 import torch
 from torch import nn
-from torch import distributions as torchd
-
-
+from torch import distributions as torch
 to_np = lambda x: x.detach().cpu().numpy()
+os.environ["MUJOCO_GL"] = "osmesa"
+sys.path.append(str(pathlib.Path(__file__).parent))
 
 
 class Dreamer(nn.Module):
