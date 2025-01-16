@@ -91,6 +91,7 @@ class Logger:
                 self._writer.add_scalar(name, value, step)
         for name, value in self._images.items():
             self._writer.add_image(name, value, step)
+        """
         for name, value in self._videos.items():
             name = name if isinstance(name, str) else name.decode("utf-8")
             if np.issubdtype(value.dtype, np.floating):
@@ -98,7 +99,7 @@ class Logger:
             B, T, H, W, C = value.shape
             value = value.transpose(1, 4, 2, 0, 3).reshape((1, T, C, H, B * W))
             self._writer.add_video(name, value, step, 16)
-
+        """
         self._writer.flush()
         self._scalars = {}
         self._images = {}
@@ -167,9 +168,11 @@ def simulate(
                 obs[index] = result
         # step agents
         obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
+        #print(f'obs: {obs}')
+
         action, agent_state = agent(obs, done, agent_state)
+        #print(f'action: {action}')
         if isinstance(action, dict):
-            """
             action = [
                 {k: np.array(action[k][i].detach().cpu()) for k in action}
                 for i in range(len(envs))
@@ -180,6 +183,7 @@ def simulate(
                 for k, v in action.items()}
                 for _ in range(len(envs))
             ]
+            """
         else:
             action = np.array(action)
         assert len(action) == len(envs)
@@ -215,7 +219,9 @@ def simulate(
                 length = len(cache[envs[i].id]["reward"]) - 1
                 score = float(np.array(cache[envs[i].id]["reward"]).sum())
                 newCache = tuple(cache.items())
-                video = cache[envs[i].id]["image"]
+                
+                video = None #video = cache[envs[i].id]["image"]
+
                 # record logs given from environments
                 for key in list(cache[envs[i].id].keys()):
                     if "log_" in key:

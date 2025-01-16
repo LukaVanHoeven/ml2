@@ -9,6 +9,7 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 
 from air_hockey_challenge.framework.agent_base import AgentBase
+from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
 from air_hockey_challenge.utils import inverse_kinematics, world_to_robot, robot_to_world
 from baseline.baseline_agent import BezierPlanner, TrajectoryOptimizer, PuckTracker
 import gym
@@ -43,8 +44,10 @@ class DummyAgent(AgentBase):
             self.new_start = False
             self.hold_position = self.get_joint_pos(observation)
 
+        print(f"observation in drawaction {observation}")
         velocity = np.zeros_like(self.hold_position)
-        action = np.vstack([self.hold_position, velocity])
+        #action = np.vstack([self.hold_position, velocity])
+        action = np.append(self.hold_position, velocity)
         return action
 
 class HittingAgentExample(AgentBase):
@@ -363,9 +366,9 @@ def custom_reward(env, state, action, next_state, absorbing):
 def main():
     from air_hockey_agent.air_hockey_challenge_dreamer_wrapper import AirHockeyChallengeDreamerWrapper
     plot_trajectory = False
-    env = AirHockeyChallengeDreamerWrapper(env="3dof-hit", interpolation_order=3, debug=False, custom_reward_function=custom_reward)
+    env = AirHockeyChallengeWrapper(env="3dof-hit", interpolation_order=3, debug=False)
     
-    agent = DreamerV3HittingAgent(env.base_env.env_info)
+    agent = DummyAgent(env.base_env.env_info)
 
     
     obs = env.reset()

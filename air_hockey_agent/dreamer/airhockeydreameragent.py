@@ -1,3 +1,7 @@
+import numpy as np
+
+#from air_hockey_challenge.framework import AgentBase
+
 import threading
 import time
 
@@ -5,9 +9,10 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 
 from air_hockey_challenge.framework.agent_base import AgentBase
-from air_hockey_challenge.utils import inverse_kinematics, world_to_robot
+#from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
+from air_hockey_challenge.utils import inverse_kinematics, world_to_robot, robot_to_world
 from baseline.baseline_agent import BezierPlanner, TrajectoryOptimizer, PuckTracker
-
+import gym
 
 def build_agent(env_info, **kwargs):
     """
@@ -20,12 +25,34 @@ def build_agent(env_info, **kwargs):
     Returns:
          (AgentBase) An instance of the Agent
     """
-    return HittingAgent(env_info, **kwargs)
+    #print(env_info)
+    return DreamerV3HittingAgent(env_info, **kwargs)
 
 
-class HittingAgent(AgentBase):
+class DummyAgent(AgentBase):
+    def __init__(self, env_info, **kwargs):
+        super().__init__(env_info, **kwargs)
+        self.new_start = True
+        self.hold_position = None
+
+    def reset(self):
+        self.new_start = True
+        self.hold_position = None
+
+    def draw_action(self, observation):
+        if self.new_start:
+            self.new_start = False
+            self.hold_position = self.get_joint_pos(observation)
+
+        #print(f"observation in drawaction {observation}")
+        velocity = np.zeros_like(self.hold_position)
+        #action = np.vstack([self.hold_position, velocity])
+        action = np.append(self.hold_position, velocity)
+        return action
+
+class HittingAgentExample(AgentBase):
     def __init__(self, env_info, agent_id=1, **kwargs):
-        super(HittingAgent, self).__init__(env_info, agent_id, **kwargs)
+        super(HittingAgentExample, self).__init__(env_info, agent_id, **kwargs)
         self.last_cmd = None
         self.joint_trajectory = None
         self.restart = True
@@ -281,28 +308,104 @@ class HittingAgent(AgentBase):
         self.restart = True
 
 
+class DreamerV3HittingAgent(AgentBase):
+    def __init__(self, env_info, agent, agent_id=1, **kwargs):
+        super().__init__(env_info, **kwargs)
+        self.new_start = True
+        self.hold_position = None
+        self.agent = agent
+
+
+    def reset(self):
+        self.new_start = True
+        self.hold_position = None
+
+    def draw_action(self, observation):
+        obs = self.agent.wm.preprocess(observation)
+        embed = self.agent._wm.encoder(obs)
+        latent, _ = self.wm.dynamics.obs_step(None, None, embed, obs["is_first"])
+        feat = self.wm.dynamics.get_feat(latent)
+
+        # Get action from Dreamer's policy
+        actor = self.task_behavior.actor(feat)
+        action = actor.sample().detach().cpu().numpy()
+
+        # Map action to [position, velocity]
+        position = action[:len(action)//2]
+        velocity = action[len(action)//2:]
+        return action
+
+def custom_reward(env, state, action, next_state, absorbing):
+    puck_pos, puck_vel = env.get_puck(next_state)
+    puck_pos_world, _ = robot_to_world(env.env_info["robot"]["base_frame"][0], translation=puck_pos)
+    
+    # Reward for scoring a goal
+    if puck_pos_world[0] > env.env_info['table']['length'] / 2 and \
+       abs(puck_pos_world[1]) < env.env_info['table']['goal_width'] / 2:
+        return 10  # Reward for scoring
+    
+    return 0
+    
+
 def main():
-    from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
+    from air_hockey_agent.air_hockey_challenge_dreamer_wrapper import AirHockeyChallengeDreamerWrapper
     plot_trajectory = False
-    env = AirHockeyChallengeWrapper(env="7dof-hit", interpolation_order=3, debug=plot_trajectory)
+    env = AirHockeyChallengeWrapper(env="3dof-hit", interpolation_order=3, debug=False)
+    
+    agent = DummyAgent(env.base_env.env_info)
 
-    agent = HittingAgent(env.base_env.env_info)
-
+    
     obs = env.reset()
     agent.reset()
-    print(f'obs in reset {obs}')
+
     steps = 0
     while True:
         steps += 1
         action = agent.draw_action(obs)
-        print(f'action in while {action}')
-
         obs, reward, done, info = env.step(action)
-        print(f'obs in while {action}')
-
+        print("State:", obs)
+        print("Action:", action)
+        print("rewards", reward)
         env.render()
 
         if done or steps > env.info.horizon:
+            if plot_trajectory:
+                import matplotlib.pyplot as plt
+                trajectory_record = np.array(env.base_env.controller_record)
+                nq = env.base_env.env_info['robot']['n_joints']
+
+                fig, axes = plt.subplots(3, nq)
+                for j in range(nq):
+                    axes[0, j].plot(trajectory_record[:, j])
+                    axes[0, j].plot(trajectory_record[:, j + nq])
+                    axes[1, j].plot(trajectory_record[:, j + 2 * nq])
+                    axes[1, j].plot(trajectory_record[:, j + 3 * nq])
+                    axes[2, j].plot(trajectory_record[:, j + 4 * nq])
+                    axes[2, j].plot(trajectory_record[:, j + nq] - trajectory_record[:, j])
+                plt.show()
+
+            steps = 0
+            obs = env.reset()
+            agent.reset()
+
+def main2():
+    from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
+    plot_trajectory = False
+    env = AirHockeyChallengeWrapper(env="3dof-hit", interpolation_order=3, debug=plot_trajectory)
+
+    agent = HittingAgentExample(env.base_env.env_info)
+
+    obs = env.reset()
+    agent.reset()
+
+    steps = 0
+    while True:
+        steps += 1
+        action = agent.draw_action(obs)
+        obs, reward, done, info = env.step(action)
+        env.render()
+
+        if steps > env.info.horizon:
             if plot_trajectory:
                 import matplotlib.pyplot as plt
                 trajectory_record = np.array(env.base_env.controller_record)

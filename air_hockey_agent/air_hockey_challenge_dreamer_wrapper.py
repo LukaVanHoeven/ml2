@@ -4,10 +4,15 @@ import numpy as np
 from copy import deepcopy
 
 class AirHockeyChallengeDreamerWrapper(AirHockeyChallengeWrapper):
+    def __init__(self, env, custom_reward_function=None, interpolation_order=3, agent=None, **kwargs):
+        super().__init__(env, custom_reward_function, interpolation_order, **kwargs)
+        self.agent = agent
+    
+    
     @property
     def observation_space(self):
         obs_space_size = len(self.env_info['puck_pos_ids']) + len(self.env_info['puck_vel_ids']) + \
-                         len(self.env_info['joint_pos_ids']) + len(self.env_info['joint_vel_ids']) + 3
+                         len(self.env_info['joint_pos_ids']) + len(self.env_info['joint_vel_ids'])
         observation_box = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_space_size,), dtype=np.float32)
 
         spaces = {}
@@ -22,10 +27,11 @@ class AirHockeyChallengeDreamerWrapper(AirHockeyChallengeWrapper):
         spaces["joint_pos_ids_box"] = joint_pos_ids_box
         spaces["joint_vel_ids_box"] = joint_vel_ids_box
         """
-        spaces["image"] = observation_box
-        spaces["is_first"] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1 ,), dtype=np.float32)
-        spaces["is_last"] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1 ,), dtype=np.float32)
-        spaces["is_terminal"] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1 ,), dtype=np.float32)
+        #spaces["image"] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
+        spaces["player"] = observation_box
+        spaces["is_first"] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32)
+        spaces["is_last"] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32)
+        spaces["is_terminal"] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32)
         return gym.spaces.Dict(spaces)
 
 
@@ -38,22 +44,28 @@ class AirHockeyChallengeDreamerWrapper(AirHockeyChallengeWrapper):
         box = gym.spaces.Box(
             low=-1,
             high=1,
-            shape=(2, 3),
+            shape= (action_dim,),
+            #shape=(2, 3),
             dtype=np.float32,
         )
         return box
     
     def reset(self, state=None):
         obs = self.base_env.reset(state)
+        self.agent.reset()
+        #print(f'obs in reset {obs}')
         obs = {
-            "image": obs,
+            #"image": [0, 0, 0],
+            "player": obs,
             "is_first": True,
             "is_last": False,
-            "is_terminal": False,
+            "is_terminal": False
             }
         return obs
 
     def step(self, action):
+        #print(f'action in step {action}')
+
         obs, reward, done, info = self.base_env.step(action)
 
         if "tournament" in self.env_name:
@@ -75,11 +87,13 @@ class AirHockeyChallengeDreamerWrapper(AirHockeyChallengeWrapper):
                                                                                   obs[self.env_info['joint_vel_ids']]))
             info["jerk"] = self.base_env.jerk
             info["success"] = self.check_success(obs)
+        #print(f'obs in step {obs}')
 
         obs = {
-            "image": obs,
+            #"image": [0, 0, 0],
+            "player": obs,
             "is_first": False,
             "is_last": done,
-            "is_terminal": self.check_success(obs)
+            "is_terminal": self.check_success(obs) > 0,
         }
         return obs, reward, done, info

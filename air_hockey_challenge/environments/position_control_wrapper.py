@@ -57,7 +57,8 @@ class PositionControl:
             elif self.interp_order[i] in [1, 2]:
                 self.action_shape[i] = (self.n_robot_joints,)
             elif self.interp_order[i] in [3, 4, -1]:
-                self.action_shape[i] = (2, self.n_robot_joints)
+                #self.action_shape[i] = (2, self.n_robot_joints)
+                self.action_shape[i] = (2 * self.n_robot_joints,)
             elif self.interp_order[i] == 5:
                 self.action_shape[i] = (3, self.n_robot_joints)
 
@@ -136,7 +137,8 @@ class PositionControl:
             if np.linalg.norm(action - prev_pos) < 1e-3:
                 prev_vel = np.zeros_like(prev_vel)
             results = np.vstack([prev_pos, action, prev_vel])
-        elif interp_order == 3 and action.shape[0] == 2:
+        elif interp_order == 3 and action.shape == (2 * self.n_robot_joints,): #action.shape[0] == 2:
+            action = action.reshape(2, self.n_robot_joints)  # Reshape back to (2, n_robot_joints)
             coef = np.array([[1, 0, 0, 0], [1, tf, tf ** 2, tf ** 3], [0, 1, 0, 0], [0, 1, 2 * tf, 3 * tf ** 2]])
             results = np.vstack([prev_pos, action[0], prev_vel, action[1]])
         elif interp_order == 4 and action.shape[0] == 2:

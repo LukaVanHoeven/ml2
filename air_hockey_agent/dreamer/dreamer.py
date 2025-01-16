@@ -23,10 +23,10 @@ import time
 import numpy as np
 from scipy.interpolate import CubicSpline
 
-from air_hockey_challenge.framework.agent_base import AgentBase
-from air_hockey_challenge.utils import inverse_kinematics, world_to_robot
+#from air_hockey_challenge.framework.agent_base import AgentBase
+#from air_hockey_challenge.utils import inverse_kinematics, world_to_robot
 from baseline.baseline_agent import BezierPlanner, TrajectoryOptimizer, PuckTracker
-
+from air_hockey_agent.dreamer.airhockeydreameragent import DummyAgent
 
 import torch
 from torch import nn
@@ -99,28 +99,42 @@ class Dreamer(nn.Module):
             latent = action = None
         else:
             latent, action = state
+
         obs = self._wm.preprocess(obs)
         embed = self._wm.encoder(obs)
+        
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
+        #print(f"Latent shape after obs_step: { {k: v.shape for k, v in latent.items()} }")
+
         if self._config.eval_state_mean:
             latent["stoch"] = latent["mean"]
         feat = self._wm.dynamics.get_feat(latent)
+        #print(f"Feature shape: {feat.shape}")
+
         if not training:
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
+            #print(f"Actor distribution parameters (not training): {actor}")
+
         elif self._should_expl(self._step):
             actor = self._expl_behavior.actor(feat)
             action = actor.sample()
         else:
             actor = self._task_behavior.actor(feat)
             action = actor.sample()
+        
+        #print(f"Action shape: {action.shape}")
+
+
         logprob = actor.log_prob(action)
         latent = {k: v.detach() for k, v in latent.items()}
         action = action.detach()
+
         if self._config.actor["dist"] == "onehot_gumble":
             action = torch.one_hot(
                 torch.argmax(action, dim=-1), self._config.num_actions
             )
+        #action = action.reshape(2, 3)
         policy_output = {"action": action, "logprob": logprob}
         state = (latent, action)
         return policy_output, state
@@ -208,7 +222,9 @@ def make_env(config, mode, id):
         #from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
         from air_hockey_agent.air_hockey_challenge_dreamer_wrapper import AirHockeyChallengeDreamerWrapper
         env = AirHockeyChallengeDreamerWrapper(env="3dof-hit", interpolation_order=3, debug=False)
-        #env = wrappers.OneHotAction(env)
+        agent = DummyAgent(env.base_env.env_info)
+        env.agent = agent
+        env = wrappers.NormalizeActions(env)
 
         #obs = env.reset()
         #print("Observation space:", env.observation_space)
@@ -267,9 +283,8 @@ def main(config):
         train_envs = [Damy(env) for env in train_envs]
         eval_envs = [Damy(env) for env in eval_envs]
     acts = train_envs[0].action_space
-    print("Action Space", acts)
     config.num_actions = acts.n if hasattr(acts, "n") else acts.shape[0]
-
+    config.num_actions = 6
     state = None
     if not config.offline_traindir:
         prefill = max(0, config.prefill - count_steps(config.traindir))
@@ -321,6 +336,8 @@ def main(config):
         tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
         agent._should_pretrain._once = False
 
+    print("Action space (prefill):", train_envs[0].action_space)
+    print("Action space (eval):", eval_envs[0].action_space)
     # make sure eval will be executed once after config.steps
     while agent._step < config.steps + config.eval_every:
         logger.write()
