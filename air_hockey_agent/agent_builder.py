@@ -73,7 +73,7 @@ class myTestAgent(AgentBase):
             # TODO: Currently working on getting the mallet to the puck
             puck_pos = self.get_puck_pos(observation)
             ee_pos = self.get_ee_pose(observation) # End effector position is the mallet pos + mallet orientation
-            mallet_pos = self.get_ee_pose(observation)[0]
+            mallet_pos = ee_pos[0]
             
             target_position = np.array([puck_pos[0], puck_pos[1], 1.00000000e-01])
             
@@ -81,29 +81,37 @@ class myTestAgent(AgentBase):
             # We only want the direction, not the magnitude. So we normalize the vector
             direction_unit = direction / np.linalg.norm(direction)  # Normalize direction            
 
-
-            # TODO: Implement step size adjustment based on constraint violations
-            # TODO: Change step size, check hitting_agent, check constraints, check how draw_action is called. Problem: Currently, the mallet moves once towards a position, but the position is also off.
-            step_size = 0.5
-            step_position = mallet_pos + direction_unit * step_size
+            # # TODO: Implement step size adjustment based on constraint violations
+            # # TODO: Change step size, check hitting_agent, check constraints, check how draw_action is called. Problem: Currently, the mallet moves once towards a position, but the position is also off.
+            # step_size = 0.5
+            # step_position = mallet_pos + direction_unit * step_size
             
             
             # The inverse_kinematics function is a method for calculating the joint angles
             # of the robot arm that will position its end-effector at a desired position
-            joint_positions = inverse_kinematics(self.robot_model, self.robot_data, step_position)[1] 
+            # success, joint_positions = inverse_kinematics(self.robot_model, self.robot_data, step_position) 
             
             # Get the joint position and velocity from the observation
-            q = observation[self.env_info['joint_pos_ids']]
-            dq = observation[self.env_info['joint_vel_ids']]
+            joint_pos_ids = observation[self.env_info['joint_pos_ids']]
+            joint_vel_ids = observation[self.env_info['joint_vel_ids']]
+            
+            print("mall_pos", mallet_pos)
+            print("puck_pos", puck_pos)
+            
+            self.ee_height = self.env_info['robot']["ee_desired_height"]
+            print("ee_height", self.ee_height)
+            print(self.env_info['robot'])
             # print("joint_pos_ids", q)
             # print("joint_vel_ids", dq)
             
             
-            print("q", q)
-            print("joint_positions", joint_positions)
+            print("joint_pos", joint_pos_ids)
+            print("Get Joint pos2", self.get_joint_pos(observation))
+            print("joint_vel", joint_vel_ids)
+            print("Get Joint vel", self.get_joint_vel(observation))
             
-            constraint_violations = self.env_info['constraints'].fun(joint_positions, dq)
-            
+            #TODO VIOLATIONS
+            # constraint_violations = self.env_info['constraints'].fun(joint_positions, dq)
             # print("constraint_violations", constraint_violations)
             
             # print("constraint_violations", constraint_violations)
@@ -111,18 +119,17 @@ class myTestAgent(AgentBase):
             #     print("Constraint violated!")
             #     # Handle violation (e.g., adjust step size or target position)
 
+            
+            # # Get a dictionary of the constraint functions {"constraint_name": ndarray}
+            # c = self.env_info['constraints'].fun(q, dq)
+            
+            # jac = self.env_info['constraints'].jacobian(q, dq)
+            
+            # # Get value of the constraint function by name
+            # c_ee = self.env_info['constraints'].get('ee_constr').fun(q, dq)
 
-            
-            # Get a dictionary of the constraint functions {"constraint_name": ndarray}
-            c = self.env_info['constraints'].fun(q, dq)
-            
-            jac = self.env_info['constraints'].jacobian(q, dq)
-            
-            # Get value of the constraint function by name
-            c_ee = self.env_info['constraints'].get('ee_constr').fun(q, dq)
-
-            # Get jacobian of the constraint function by name
-            jac_vel = self.env_info['constraints'].get('joint_vel_constr').jacobian(q, dq)      
+            # # Get jacobian of the constraint function by name
+            # jac_vel = self.env_info['constraints'].get('joint_vel_constr').jacobian(q, dq)      
             # print("jac_vel", jac_vel)
             
             # Joint pos limits:
@@ -138,16 +145,16 @@ class myTestAgent(AgentBase):
             # [-1.15570723, 1.30024401, 1.44280414]
             
             if self.episode > 1:
-                # self.new_position = np.array([-1.15570723, 1.30024401, 1.44280414]) # Start position of the robot
-                self.new_position = joint_positions
+                self.new_position = np.array([-1.15570723, 1.30024401, 1.44280414]) # Start position of the robot
+                # self.new_position = joint_positions
             else:
-                # self.new_position = np.array([-1.15570723, 1.30024401, 1.44280414]) # Start position of the robot
-                self.new_position = joint_positions
+                self.new_position = np.array([-1.15570723, 1.30024401, -1.44280414]) # Start position of the robot
+                # self.new_position = joint_positions
                 # self.new_position = target_position # Start position of the robot
                 # self.new_position = self.get_joint_pos(observation)
                 
             self.episode += 1
-            print(self.episode)      
+            print("BBBBBBBBBBBBBb", self.episode)      
             
             # print("\n newPos", self.new_position)
             # print("Joint pos", self.get_joint_pos(observation))
