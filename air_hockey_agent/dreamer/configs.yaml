@@ -7,10 +7,10 @@ defaults:
   offline_evaldir: ''
   seed: 0
   deterministic_run: False
-  steps: 100 #1e4
+  steps: 1000 #1e4
   parallel: False
   eval_every: 100 #1e2
-  eval_episode_num: 2 #10
+  eval_episode_num: 10 #10
   log_every: 1e4 #1e2
   reset_every: 0
   device: 'cpu' #change back to "cuda:0" when on gpu

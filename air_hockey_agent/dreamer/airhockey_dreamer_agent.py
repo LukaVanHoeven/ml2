@@ -4,6 +4,7 @@ import numpy as np
 
 import threading
 import time
+from scipy.linalg import lstsq
 
 import numpy as np
 from scipy.interpolate import CubicSpline
@@ -112,8 +113,8 @@ class DreamerV3HittingAgent(AgentBase):
         new_ddq_cmd = np.clip(ddq_cmd, self.ddq_lower, self.ddq_upper)  # Clip acceleration
 
         # Only modify dq_cmd if clipping actually changed acceleration
-        if not np.allclose(new_ddq_cmd, ddq_cmd):  # Check if clipping changed ddq_cmd
-            dq_cmd = self.last_velocity + new_ddq_cmd * self.dt
+        #if not np.allclose(new_ddq_cmd, ddq_cmd):  # Check if clipping changed ddq_cmd
+            #dq_cmd = self.last_velocity + new_ddq_cmd * self.dt
             
 
         """
@@ -155,7 +156,7 @@ class DreamerV3HittingAgent(AgentBase):
                         print(f"Applied correction for {name}: {correction}")
         """
             # 5️⃣ Retrieve and evaluate dynamic constraints (if available)
-
+        """
         c = self.env_info['constraints'].fun(q_cmd, dq_cmd)
         jac = self.env_info['constraints'].jacobian(q_cmd, dq_cmd)
 
@@ -170,6 +171,24 @@ class DreamerV3HittingAgent(AgentBase):
 
             if np.any(violation > 0):  # Constraint is violated (positive means violation)
                 print(f"Warning: {name} constraint violated! Applying correction.")
+
+                if jacobian is not None:
+                    correction = -np.linalg.pinv(jacobian) @ violation  # Compute correction
+                    q_cmd += correction * self.dt  # Adjust position
+                    dq_cmd += correction  # Adjust velocity
+
+        c = self.env_info['constraints'].fun(q_cmd, dq_cmd)
+        jac = self.env_info['constraints'].jacobian(q_cmd, dq_cmd)
+
+
+        for name, violation in c.items():
+            jacobian = jac.get(name)
+
+            if jacobian.shape[1] > 3:  
+                jacobian = jacobian[:, :3]  # Keep only the first 3 columns
+
+            if np.any(violation > 0):  # Constraint is violated (positive means violation)
+                print(f"Warning: {name} constraint violated AGAAINNNNASNDFNASDFN! Applying correction.")
 
                 if jacobian is not None:
                     correction = -np.linalg.pinv(jacobian) @ violation  # Compute correction
@@ -212,13 +231,39 @@ class DreamerV3HittingAgent(AgentBase):
 
                 q_cmd += correction * self.dt  # Adjust position
                 dq_cmd += correction  # Adjust velocity
+        """
+        
+        MAX_ITERS = 10  # Prevent infinite loops
+        for constraint_name in ['joint_pos_constr', 'joint_vel_constr', 'ee_constr']:
+            if constraint_name in self.env_info['constraints'].keys():
+                for i in range(MAX_ITERS):  # Try multiple correction steps
+                    violation = self.env_info['constraints'].get(constraint_name).fun(q_cmd, dq_cmd)
+                    jacobian = self.env_info['constraints'].get(constraint_name).jacobian(q_cmd, dq_cmd)
 
+                    if jacobian.shape[1] > 3:  
+                        jacobian = jacobian[:, :3]  # Keep only the first 3 columns
+
+                    if np.linalg.cond(jacobian) > 1e3:
+                        pass  
+                        #print("Warning: Jacobian is poorly conditioned! Consider damping.")
+
+                    if np.any(violation > 0):  
+                        #print(f"Warning: {constraint_name} violated (iteration {i+1})! Applying correction.")
+
+                        jac_inv = -np.linalg.pinv(jacobian)
+                        correction = jac_inv @ violation
+                        max_correction = 1.0  # Tune this
+                        correction = np.clip(correction, -max_correction, max_correction)
+                        # Apply correction
+                        q_cmd += correction * self.dt  # Adjust position
+                        dq_cmd += correction  # Adjust velocity
+                    else:
+                        break  # Exit loop if violation is gone
+        
         # 7️⃣ Final safety clipping
         q_cmd = np.clip(q_cmd, self.q_lower, self.q_upper)
         dq_cmd = np.clip(dq_cmd, self.dq_lower, self.dq_upper)
         self.last_velocity = dq_cmd.copy()
-
-
 
         new_action = np.append(q_cmd, dq_cmd)
         return new_action
