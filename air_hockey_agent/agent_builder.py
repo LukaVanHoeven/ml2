@@ -45,6 +45,11 @@ class DummyAgent(AgentBase):
             self.hold_position = self.get_joint_pos(observation)
 
         print(f"observation in drawaction {observation}")
+        print(f"puck_pos_ids: {self.env_info['puck_pos_ids']}")
+        print(f"puck_vel_ids: {self.env_info['puck_vel_ids']}")
+        print(f"joint_pos_ids: {self.env_info['joint_pos_ids']}")
+        print(f"joint_vel_ids: {self.env_info['joint_vel_ids']}")
+
         velocity = np.zeros_like(self.hold_position)
         #action = np.vstack([self.hold_position, velocity])
         action = np.append(self.hold_position, velocity)

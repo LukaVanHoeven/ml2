@@ -64,8 +64,7 @@ class AirHockeyChallengeDreamerWrapper(AirHockeyChallengeWrapper):
         return obs
 
     def step(self, action):
-        #print(f'action in step {action}')
-
+        new_action = self.agent.draw_action(action)
         obs, reward, done, info = self.base_env.step(action)
 
         if "tournament" in self.env_name:

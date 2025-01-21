@@ -157,7 +157,6 @@ def simulate(
             results = [r() for r in results]
             for index, result in zip(indices, results):
                 t = result.copy()
-                print(t)
                 t = {k: convert(v) for k, v in t.items()}
                 # action will be added to transition in add_to_cache
                 t["reward"] = 0.0

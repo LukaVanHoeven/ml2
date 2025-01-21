@@ -26,7 +26,8 @@ from scipy.interpolate import CubicSpline
 #from air_hockey_challenge.framework.agent_base import AgentBase
 #from air_hockey_challenge.utils import inverse_kinematics, world_to_robot
 from baseline.baseline_agent import BezierPlanner, TrajectoryOptimizer, PuckTracker
-from air_hockey_agent.dreamer.airhockeydreameragent import DummyAgent
+from air_hockey_agent.dreamer.airhockey_dreamer_agent import DreamerV3HittingAgent, DummyAgent
+from air_hockey_agent.dreamer.reward import Reward
 
 import torch
 from torch import nn
@@ -66,6 +67,8 @@ class Dreamer(nn.Module):
             plan2explore=lambda: expl.Plan2Explore(config, self._wm, reward),
         )[config.expl_behavior]().to(self._config.device)
 
+        self.last_action = None
+
     def __call__(self, obs, reset, state=None, training=True):
         step = self._step
         if training:
@@ -104,12 +107,10 @@ class Dreamer(nn.Module):
         embed = self._wm.encoder(obs)
         
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
-        #print(f"Latent shape after obs_step: { {k: v.shape for k, v in latent.items()} }")
 
         if self._config.eval_state_mean:
             latent["stoch"] = latent["mean"]
         feat = self._wm.dynamics.get_feat(latent)
-        #print(f"Feature shape: {feat.shape}")
 
         if not training:
             actor = self._task_behavior.actor(feat)
@@ -123,8 +124,6 @@ class Dreamer(nn.Module):
             actor = self._task_behavior.actor(feat)
             action = actor.sample()
         
-        #print(f"Action shape: {action.shape}")
-
 
         logprob = actor.log_prob(action)
         latent = {k: v.detach() for k, v in latent.items()}
@@ -137,6 +136,7 @@ class Dreamer(nn.Module):
         #action = action.reshape(2, 3)
         policy_output = {"action": action, "logprob": logprob}
         state = (latent, action)
+        self.last_action = action
         return policy_output, state
 
     def _train(self, data):
@@ -221,8 +221,10 @@ def make_env(config, mode, id):
     elif suite == "airhockey":
         #from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
         from air_hockey_agent.air_hockey_challenge_dreamer_wrapper import AirHockeyChallengeDreamerWrapper
-        env = AirHockeyChallengeDreamerWrapper(env="3dof-hit", interpolation_order=3, debug=False)
-        agent = DummyAgent(env.base_env.env_info)
+        reward_function = Reward().custom_reward
+        env = AirHockeyChallengeDreamerWrapper(env="3dof-hit", custom_reward_function=reward_function, interpolation_order=3, debug=False)
+        agent = DreamerV3HittingAgent(env.base_env.env_info)
+
         env.agent = agent
         env = wrappers.NormalizeActions(env)
 
