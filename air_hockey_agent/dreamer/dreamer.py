@@ -221,10 +221,10 @@ def make_env(config, mode, id):
     elif suite == "airhockey":
         #from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
         from air_hockey_agent.air_hockey_challenge_dreamer_wrapper import AirHockeyChallengeDreamerWrapper
-        reward_function = Reward().custom_reward
-        env = AirHockeyChallengeDreamerWrapper(env="3dof-hit", custom_reward_function=reward_function, interpolation_order=3, debug=False)
+        reward = Reward()
+        env = AirHockeyChallengeDreamerWrapper(env="3dof-hit", custom_reward_function=reward.custom_reward, interpolation_order=3, debug=False)
         agent = DreamerV3HittingAgent(env.base_env.env_info)
-
+        reward.setAgent(agent)
         env.agent = agent
         env = wrappers.NormalizeActions(env)
 

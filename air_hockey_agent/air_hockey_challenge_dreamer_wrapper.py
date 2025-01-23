@@ -65,7 +65,7 @@ class AirHockeyChallengeDreamerWrapper(AirHockeyChallengeWrapper):
 
     def step(self, action):
         new_action = self.agent.draw_action(action)
-        obs, reward, done, info = self.base_env.step(action)
+        obs, reward, done, info = self.base_env.step(new_action)
 
         if "tournament" in self.env_name:
             info["constraints_value"] = list()

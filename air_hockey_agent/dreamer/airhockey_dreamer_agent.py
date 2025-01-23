@@ -233,7 +233,7 @@ class DreamerV3HittingAgent(AgentBase):
                 dq_cmd += correction  # Adjust velocity
         """
         
-        MAX_ITERS = 10  # Prevent infinite loops
+        MAX_ITERS = 5  # Prevent infinite loops
         for constraint_name in ['joint_pos_constr', 'joint_vel_constr', 'ee_constr']:
             if constraint_name in self.env_info['constraints'].keys():
                 for i in range(MAX_ITERS):  # Try multiple correction steps

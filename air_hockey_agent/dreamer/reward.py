@@ -4,6 +4,8 @@ import numpy as np
 class Reward:
     def __init__(self):
         self.has_hit = False
+    def setAgent(self, agent):
+        self.agent = agent
 
     def custom_reward(self, env, state, action, next_state, absorbing):
         r = 0
@@ -20,18 +22,17 @@ class Reward:
                 > 0
                 > (np.abs(puck_pos[1]) - env.env_info["table"]["goal_width"] / 2)
             ):
-                r = 50
+                r = 10000
             self.has_hit = False
             return r
         else:
             # If the puck has not yet been hit, encourage the robot to get closer to the puck
             if not self.has_hit:
-                ee_pos = self.get_ee_pose(state)[0][:2]  # Get end-effector (x, y)
+                ee_pos = self.agent.get_ee_pose(state)[0][:2]  # Get end-effector (x, y)
 
-                dist_ee_puck = np.linalg.norm(puck_pos - ee_pos)  # Euclidean distance
+                dist_ee_puck = np.linalg.norm(puck_pos[:2] - ee_pos)  # Euclidean distance
 
                 #vec_ee_puck = (puck_pos - ee_pos) / (dist_ee_puck + 1e-6)  # Normalized direction vector
-
                 # Encourage movement towards the puck
                 r = -dist_ee_puck
         

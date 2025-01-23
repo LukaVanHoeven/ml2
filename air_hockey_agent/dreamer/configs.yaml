@@ -7,9 +7,9 @@ defaults:
   offline_evaldir: ''
   seed: 0
   deterministic_run: False
-  steps: 1000 #1e4
+  steps: 5000 #1e4
   parallel: False
-  eval_every: 100 #1e2
+  eval_every: 1024 #1e2
   eval_episode_num: 10 #10
   log_every: 1e4 #1e2
   reset_every: 0
@@ -21,12 +21,11 @@ defaults:
 
   # Environment
   task: 'airhockey_hit'
-  #size: [64, 64]
   envs: 1
   action_repeat: 2
-  time_limit: 3 #1000
+  time_limit: 1000
   grayscale: False
-  prefill: 1 #2500
+  prefill: 2500
   reward_EMA: True
 
   # Model
@@ -62,14 +61,14 @@ defaults:
   initial: 'learned'
 
   # Training
-  batch_size: 4 #16
+  batch_size: 8 #16
   batch_length: 16 #64
-  train_ratio: 32 #512
-  pretrain: 5 #100
+  train_ratio: 64 #512
+  pretrain: 20 #100
   model_lr: 1e-4
   opt_eps: 1e-8
-  grad_clip: 10 #1000
-  dataset_size: 100 #1000000
+  grad_clip: 100 #1000
+  dataset_size: 1000 #1000000
   opt: 'adam'
 
   # Behavior.
@@ -129,9 +128,9 @@ airhockey:
   envs: 1
   action_repeat: 2
   video_pred_log: False
-  time_limit: 3 #1000
+  time_limit: 1000 #1000
   grayscale: False
-  prefill: 1 #2500
+  prefill: 2500 #2500
   reward_EMA: True
 
 crafter:
