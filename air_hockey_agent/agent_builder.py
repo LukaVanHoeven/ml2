@@ -67,47 +67,48 @@ class myTestAgent(AgentBase):
 
     def draw_action(self, observation):
         
-        if self.new_start:
+        if self.new_start: # Init (after a goal), with the robot at the start position
             self.new_start = False       
             
-            # TODO: Currently working on getting the mallet to the puck
+            # Get the joint position and velocity from the observation
+            joint_pos = observation[self.env_info['joint_pos_ids']]
+            joint_vel = observation[self.env_info['joint_vel_ids']]
+            
             puck_pos = self.get_puck_pos(observation)
             ee_pos = self.get_ee_pose(observation) # End effector position is the mallet pos + mallet orientation
             mallet_pos = ee_pos[0]
             
-            target_position = np.array([puck_pos[0], puck_pos[1], 1.00000000e-01])
-            
-            direction = target_position - mallet_pos
-            # We only want the direction, not the magnitude. So we normalize the vector
-            direction_unit = direction / np.linalg.norm(direction)  # Normalize direction            
+            self.ee_height = self.env_info['robot']["ee_desired_height"]
+            target_position = np.array([puck_pos[0], puck_pos[1], self.ee_height]) # x,y,z coordinate
+            print("target_position", target_position)        
 
-            # # TODO: Implement step size adjustment based on constraint violations
-            # # TODO: Change step size, check hitting_agent, check constraints, check how draw_action is called. Problem: Currently, the mallet moves once towards a position, but the position is also off.
-            # step_size = 0.5
-            # step_position = mallet_pos + direction_unit * step_size
-            
+            # # TODO: Don't pick the puck position as target position, but make a stepwise trajectory towards the puck
+            # # TODO: Check velocity constraints, update speed accordingly
             
             # The inverse_kinematics function is a method for calculating the joint angles
             # of the robot arm that will position its end-effector at a desired position
-            # success, joint_positions = inverse_kinematics(self.robot_model, self.robot_data, step_position) 
             
-            # Get the joint position and velocity from the observation
-            joint_pos_ids = observation[self.env_info['joint_pos_ids']]
-            joint_vel_ids = observation[self.env_info['joint_vel_ids']]
+            print("Joint Positions (qpos):", self.robot_data.qpos)
+            
+            success, target_joint_positions = inverse_kinematics(self.robot_model, self.robot_data, desired_position=puck_pos, initial_q=joint_pos)
+            print("success, target_joint_positions", success, target_joint_positions)            
+            
+            
+            print(self.env_info['robot']['robot_data'])
+            print("CCCCCCCCccc")
             
             print("mall_pos", mallet_pos)
             print("puck_pos", puck_pos)
             
             self.ee_height = self.env_info['robot']["ee_desired_height"]
-            print("ee_height", self.ee_height)
             print(self.env_info['robot'])
             # print("joint_pos_ids", q)
             # print("joint_vel_ids", dq)
             
             
-            print("joint_pos", joint_pos_ids)
+            print("joint_pos", joint_pos)
             print("Get Joint pos2", self.get_joint_pos(observation))
-            print("joint_vel", joint_vel_ids)
+            print("joint_vel", joint_vel)
             print("Get Joint vel", self.get_joint_vel(observation))
             
             #TODO VIOLATIONS
@@ -146,9 +147,12 @@ class myTestAgent(AgentBase):
             
             if self.episode > 1:
                 self.new_position = np.array([-1.15570723, 1.30024401, 1.44280414]) # Start position of the robot
+                self.new_position = np.array([-1.25557634,  0.98377039,  1.21431271]) # What?
+                self.new_position = target_joint_positions
+                
                 # self.new_position = joint_positions
             else:
-                self.new_position = np.array([-1.15570723, 1.30024401, -1.44280414]) # Start position of the robot
+                self.new_position = np.array([-1.15570723, 1.30024401, 1.44280414]) # Start position of the robot
                 # self.new_position = joint_positions
                 # self.new_position = target_position # Start position of the robot
                 # self.new_position = self.get_joint_pos(observation)
