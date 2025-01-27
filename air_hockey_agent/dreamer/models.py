@@ -60,7 +60,7 @@ class WorldModel(nn.Module):
         self.heads["decoder"] = networks.MultiDecoder(
             feat_size, shapes, **config.decoder
         )
-        self.heads["reward"] = networks.MLP(
+        self.heads["reward"] = networks.SparseMLP(
             feat_size,
             (255,) if config.reward_head["dist"] == "symlog_disc" else (),
             config.reward_head["layers"],
@@ -72,7 +72,7 @@ class WorldModel(nn.Module):
             device=config.device,
             name="Reward",
         )
-        self.heads["cont"] = networks.MLP(
+        self.heads["cont"] = networks.SparseMLP(
             feat_size,
             (),
             config.cont_head["layers"],
@@ -228,7 +228,7 @@ class ImagBehavior(nn.Module):
             feat_size = config.dyn_stoch * config.dyn_discrete + config.dyn_deter
         else:
             feat_size = config.dyn_stoch + config.dyn_deter
-        self.actor = networks.MLP(
+        self.actor = networks.SparseMLP(
             feat_size,
             (config.num_actions,),
             config.actor["layers"],
@@ -245,7 +245,7 @@ class ImagBehavior(nn.Module):
             outscale=config.actor["outscale"],
             name="Actor",
         )
-        self.value = networks.MLP(
+        self.value = networks.SparseMLP(
             feat_size,
             (255,) if config.critic["dist"] == "symlog_disc" else (),
             config.critic["layers"],

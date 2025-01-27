@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch import distributions as torchd
 
 import tools
+import sparse_utils
 
 
 class RSSM(nn.Module):
@@ -344,7 +345,7 @@ class MultiEncoder(nn.Module):
                 name="Encoder",
             )
             self.outdim += mlp_units
-
+        
     def forward(self, obs):
         outputs = []
         if self.cnn_shapes:
@@ -808,3 +809,229 @@ class ImgChLayerNorm(nn.Module):
         x = self.norm(x)
         x = x.permute(0, 3, 1, 2)
         return x
+
+class SparseMLP(nn.Module):
+    def __init__(
+        self,
+        state_dim,
+        shape,
+        layers,
+        units, 
+        act="SiLU",
+        norm=True,
+        dist="normal",
+        std=1.0,
+        min_std=0.1,
+        max_std=1.0,
+        absmax=None,
+        temp=0.1,
+        unimix_ratio=0.01,
+        outscale=1.0,
+        symlog_inputs=False,
+        device="cpu",
+        name="NoName",
+        epsilonHid1 = 20, 
+        epsilonHid2 = 20, 
+        ascTopologyChangePeriod=1000,
+    ):
+        super(SparseMLP, self).__init__()
+        self._shape = (shape,) if isinstance(shape, int) else shape
+        if self._shape is not None and len(self._shape) == 0:
+            self._shape = (1,)
+            
+        self.last_topology_change = False
+        self.steps = 0
+        print('sparse')
+        
+        act = getattr(torch.nn, "ReLU")
+        self._dist = dist
+        self._std = std if isinstance(std, str) else torch.tensor((std,), device=device)
+        self._min_std = min_std
+        self._max_std = max_std
+        self._absmax = absmax
+        self._temp = temp
+        self._unimix_ratio = unimix_ratio
+        self._symlog_inputs = symlog_inputs
+        self._device = device
+
+        # First hidden layer
+        self.l1 = nn.Linear(state_dim, units, bias=False)
+        [self.noPar1, self.mask1] = sparse_utils.initializeEpsilonWeightsMask(
+            f"{name}_first_layer", 
+            epsilonHid1, 
+            state_dim, 
+            units
+        )
+        self.torch_mask1 = torch.from_numpy(self.mask1).float().to(device)
+        self.l1.weight.data.mul_(self.torch_mask1)
+        
+        print(state_dim)
+        print(f"units: {units} epilon hid2: {epsilonHid2} hid1: {epsilonHid1}")
+
+        # Second hidden layer
+        self.l2 = nn.Linear(units, units, bias=False)
+        [self.noPar2, self.mask2] = sparse_utils.initializeEpsilonWeightsMask(
+            f"{name}_second_layer", 
+            epsilonHid2, 
+            units, 
+            units
+        )
+        self.torch_mask2 = torch.from_numpy(self.mask2).float().to(device)
+        self.l2.weight.data.mul_(self.torch_mask2)
+        
+        # Layer norms if enabled
+        self.norm1 = nn.LayerNorm(units, eps=1e-03) if norm else None
+        self.norm2 = nn.LayerNorm(units, eps=1e-03) if norm else None
+        
+        # Activation
+        self.act = act()
+
+        # Output layer
+        if isinstance(self._shape, dict):
+            self.mean_layer = nn.ModuleDict()
+            for name, shape in self._shape.items():
+                self.mean_layer[name] = nn.Linear(units, np.prod(shape))
+            self.mean_layer.apply(tools.uniform_weight_init(outscale))
+            if self._std == "learned":
+                self.std_layer = nn.ModuleDict()
+                for name, shape in self._shape.items():
+                    self.std_layer[name] = nn.Linear(units, np.prod(shape))
+                self.std_layer.apply(tools.uniform_weight_init(outscale))
+        elif self._shape is not None:
+            self.mean_layer = nn.Linear(units, np.prod(self._shape))
+            self.mean_layer.apply(tools.uniform_weight_init(outscale))
+            if self._std == "learned":
+                self.std_layer = nn.Linear(units, np.prod(self._shape))
+                self.std_layer.apply(tools.uniform_weight_init(outscale))
+
+    def update_connectivity(self, zeta):
+        """Update connectivity using SET algorithm"""
+        # Update first layer
+        weights1 = self.l1.weight.data
+        weights1_np = weights1.cpu().numpy()
+        mask1_np = self.torch_mask1.cpu().numpy()
+        [new_mask1, stats1] = sparse_utils.changeConnectivitySET(
+            weights1_np,
+            self.noPar1,
+            mask1_np,
+            zeta,
+            self.last_topology_change,
+            self.steps
+        )
+        self.torch_mask1 = torch.from_numpy(new_mask1).float().to(self._device)
+        self.l1.weight.data.mul_(self.torch_mask1)
+        
+        # Update second layer
+        weights2 = self.l2.weight.data
+        weights2_np = weights2.cpu().numpy()
+        mask2_np = self.torch_mask2.cpu().numpy()
+        [new_mask2, stats2] = sparse_utils.changeConnectivitySET(
+            weights2_np,
+            self.noPar2,
+            mask2_np,
+            zeta,
+            self.last_topology_change,
+            self.steps
+        )
+        self.torch_mask2 = torch.from_numpy(new_mask2).float().to(self._device)
+        self.l2.weight.data.mul_(self.torch_mask2)
+        
+
+    def forward(self, features, dtype=None):
+        self.steps += 1
+        if self.steps % 10 == 0:
+            self.update_connectivity(0.3)
+        x = features
+        if self._symlog_inputs:
+            x = tools.symlog(x)
+        
+        # First layer
+        x = self.l1(x)
+        if self.norm1 is not None:
+            x = self.norm1(x)
+        x = self.act(x)
+        
+        # Second layer
+        x = self.l2(x)
+        if self.norm2 is not None:
+            x = self.norm2(x)
+        x = self.act(x)
+
+        # Output handling
+        if self._shape is None:
+            return x
+        if isinstance(self._shape, dict):
+            dists = {}
+            for name, shape in self._shape.items():
+                mean = self.mean_layer[name](x)
+                if self._std == "learned":
+                    std = self.std_layer[name](x)
+                else:
+                    std = self._std
+                dists.update({name: self.dist(self._dist, mean, std, shape)})
+            return dists
+        else:
+            mean = self.mean_layer(x)
+            if self._std == "learned":
+                std = self.std_layer(x)
+            else:
+                std = self._std
+            return self.dist(self._dist, mean, std, self._shape)
+        
+    def dist(self, dist, mean, std, shape):
+        if dist == "tanh_normal":
+            mean = torch.tanh(mean)
+            std = F.softplus(std) + self._min_std
+            dist = torchd.normal.Normal(mean, std)
+            dist = torchd.transformed_distribution.TransformedDistribution(
+                dist, tools.TanhBijector()
+            )
+            dist = torchd.independent.Independent(dist, 1)
+            dist = tools.SampleDist(dist)
+        elif dist == "normal":
+            std = (self._max_std - self._min_std) * torch.sigmoid(
+                std + 2.0
+            ) + self._min_std
+            dist = torchd.normal.Normal(torch.tanh(mean), std)
+            dist = tools.ContDist(
+                torchd.independent.Independent(dist, 1), absmax=self._absmax
+            )
+        elif dist == "normal_std_fixed":
+            dist = torchd.normal.Normal(mean, self._std)
+            dist = tools.ContDist(
+                torchd.independent.Independent(dist, 1), absmax=self._absmax
+            )
+        elif dist == "trunc_normal":
+            mean = torch.tanh(mean)
+            std = 2 * torch.sigmoid(std / 2) + self._min_std
+            dist = tools.SafeTruncatedNormal(mean, std, -1, 1)
+            dist = tools.ContDist(
+                torchd.independent.Independent(dist, 1), absmax=self._absmax
+            )
+        elif dist == "onehot":
+            dist = tools.OneHotDist(mean, unimix_ratio=self._unimix_ratio)
+        elif dist == "onehot_gumble":
+            dist = tools.ContDist(
+                torchd.gumbel.Gumbel(mean, 1 / self._temp), absmax=self._absmax
+            )
+        elif dist == "huber":
+            dist = tools.ContDist(
+                torchd.independent.Independent(
+                    tools.UnnormalizedHuber(mean, std, 1.0),
+                    len(shape),
+                    absmax=self._absmax,
+                )
+            )
+        elif dist == "binary":
+            dist = tools.Bernoulli(
+                torchd.independent.Independent(
+                    torchd.bernoulli.Bernoulli(logits=mean), len(shape)
+                )
+            )
+        elif dist == "symlog_disc":
+            dist = tools.DiscDist(logits=mean, device=self._device)
+        elif dist == "symlog_mse":
+            dist = tools.SymlogDist(mean)
+        else:
+            raise NotImplementedError(dist)
+        return dist

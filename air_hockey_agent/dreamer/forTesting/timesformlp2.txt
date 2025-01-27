@@ -1,0 +1,11 @@
+ 7 Sat Jan 25 13:39:24 2025    23:21:28 /usr/bin/python /usr/local/bin/jupyterhub-singleuser
+   1119 Sat Jan 25 14:47:59 2025    22:12:53 /usr/bin/python -m ipykernel_launcher -f /home/jovyan/.local/share/jupyter/runtime/kernel-553d7866-79eb-42c9-9394-42281682b6ae.json
+   1198 Sat Jan 25 14:49:40 2025    22:11:12 /usr/bin/python
+   2976 Sat Jan 25 15:51:07 2025    21:09:45 /usr/bin/python
+  11280 Sun Jan 26 03:16:54 2025    09:43:58 python dreamer.py --configs airhockey --task airhockey_hit --logdir ./logdir/airhockeyMLP2
+  11904 Sun Jan 26 13:00:52 2025       00:00 grep --color=auto python" So when did it start?
+
+  270126
+
+  
+  end time: 21:01

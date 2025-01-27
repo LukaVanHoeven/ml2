@@ -7,15 +7,15 @@ defaults:
   offline_evaldir: ''
   seed: 0
   deterministic_run: False
-  steps: 5000 #1e4
+  steps: 1e5 #1e4
   parallel: False
   eval_every: 1024 #1e2
-  eval_episode_num: 10 #10
+  eval_episode_num: 5 #10
   log_every: 1e4 #1e2
   reset_every: 0
-  device: 'cpu' #change back to "cuda:0" when on gpu
+  device: 'cuda:0' #change back to "cuda:0" when on gpu
   compile: True
-  precision: 32
+  precision: 16 #32
   debug: True #False
   video_pred_log: False #True
 
@@ -61,14 +61,14 @@ defaults:
   initial: 'learned'
 
   # Training
-  batch_size: 8 #16
-  batch_length: 16 #64
-  train_ratio: 64 #512
-  pretrain: 1 #100
+  batch_size: 16 #16
+  batch_length: 64 #64
+  train_ratio: 256 #512
+  pretrain: 100 #100
   model_lr: 1e-4
   opt_eps: 1e-8
-  grad_clip: 100 #1000
-  dataset_size: 1000 #1000000
+  grad_clip: 1000 #1000
+  dataset_size: 1000000 #1000000
   opt: 'adam'
 
   # Behavior.
@@ -123,14 +123,14 @@ dmc_walker:
 airhockey:
   task: 'airhockey_hit'
   #size: [64, 64]
-  encoder: {mlp_keys: '.*', cnn_keys: '$^', act: 'ReLU', norm: True, mlp_layers: 2, mlp_units: 32}
-  decoder: {mlp_keys: '.*', cnn_keys: '$^', act: 'ReLU', norm: True, mlp_layers: 2, mlp_units: 32}
+  encoder: {mlp_keys: '.*', cnn_keys: '$^', act: 'ReLU', norm: True, mlp_layers: 3, mlp_units: 128}
+  decoder: {mlp_keys: '.*', cnn_keys: '$^', act: 'ReLU', norm: True, mlp_layers: 3, mlp_units: 128}
   envs: 1
   action_repeat: 2
   video_pred_log: False
-  time_limit: 20 #1000
+  time_limit: 1000
   grayscale: False
-  prefill: 20 #2500
+  prefill: 2500
   reward_EMA: True
 
 crafter:

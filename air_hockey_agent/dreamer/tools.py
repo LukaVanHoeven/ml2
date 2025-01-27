@@ -17,6 +17,8 @@ from torch.nn import functional as F
 from torch import distributions as torchd
 from torch.utils.tensorboard import SummaryWriter
 
+#
+
 
 to_np = lambda x: x.detach().cpu().numpy()
 
@@ -138,6 +140,8 @@ def simulate(
     steps=0,
     episodes=0,
     state=None,
+    zeta=0.3,  # New parameter for connectivity update
+    topology_change_period=1000,  # Period for updating connectivity
 ):
     # initialize or unpack simulation state
     if state is None:
@@ -197,6 +201,9 @@ def simulate(
         length += 1
         step += len(envs)
         length *= 1 - done
+
+        if steps % 1000 == 0 and is_eval == False:
+            pass
         # add to cache
         for a, result, env in zip(action, results, envs):
             o, r, d, info = result

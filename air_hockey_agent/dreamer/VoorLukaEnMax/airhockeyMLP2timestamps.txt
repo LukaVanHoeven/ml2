@@ -1,0 +1,3 @@
+Start van step 0 was:                   03:16:54 (nadat ik even uit was nog geweest ff modelletje aanzetten natuurlijk)
+Timestemp van 100.000 was ongeveer:     06:25   
+End van step 500.000 was:               21:01

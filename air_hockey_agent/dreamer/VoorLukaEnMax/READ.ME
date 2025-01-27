@@ -1,0 +1,50 @@
+Voor Luka en Max
+
+- configofrMLP2.txt bevat de configuration voor de dreamer Zonder Sparsity
+- configforSparseMLP.txt bevat de configuration voor de Dreamer MET sparsity
+
+Het verschil tussen die twee is dat Met Sparsity 1e5 steps heeft gedaan (100.000 steps) en ZONDER SPARSITY heeft 500.000 steps. Zie ook Metrics.jsonl van beide modellen.
+
+Voor luka misschien handig: ik heb de sparse_utils aangepast naar torch ipv. numpy vanwege gedoe over cpu en cuda
+
+
+In de models.py staan alle world models and imagemodels die dreamer gebruikt. Ik heb de actor, value function, reward? en cont? sparse gemaakt.
+Dus als je naar models.py en ff control-f doet naar SparseMLP( doet, dan vindt je het wel.
+
+Voorbeeld:
+self.actor = networks.SparseMLP( <----------------------------------
+            feat_size,
+            (config.num_actions,),
+            config.actor["layers"],
+            config.units,
+            config.act,
+            config.norm,
+            config.actor["dist"],
+            config.actor["std"],
+            config.actor["min_std"],
+            config.actor["max_std"],
+            absmax=1.0,
+            temp=config.actor["temp"],
+            unimix_ratio=config.actor["unimix_ratio"],
+            outscale=config.actor["outscale"],
+            name="Actor",
+        )
+        self.value = networks.SparseMLP( <-----------------------------------
+            feat_size,
+            (255,) if config.critic["dist"] == "symlog_disc" else (),
+            config.critic["layers"],
+            config.units,
+            config.act,
+            config.norm,
+            config.critic["dist"],
+            outscale=config.critic["outscale"],
+            device=config.device,
+            name="Value",
+        )
+
+Dan heb je ook nog de timestemps voor wanneer de ze bij stap 100.000 (en 500.000). Die zie je in de ...timestemps.txt files.
+Ik heb net opgemerkt dat de SparseMLP 1 uur! sneller is dan de normale MLP. Iets van 30 a 40% sneller.
+
+Mocht je nog meer vragen hebben, dan hoor ik het graag
+
+

@@ -9,6 +9,12 @@ import sys
 import numpy as np
 import ruamel.yaml as yaml
 
+ROOT_DIR = str(pathlib.Path(__file__).parent)
+ROOT_DIR = os.path.abspath(os.path.dirname(__file__))  # Get the script’s root folder
+
+print(ROOT_DIR)
+
+
 sys.path.append(str(pathlib.Path(__file__).parent))
 
 import exploration as expl
