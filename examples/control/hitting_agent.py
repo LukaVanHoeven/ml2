@@ -128,7 +128,9 @@ class HittingAgent(AgentBase):
             self.last_cmd[0] = joint_pos_des
         else:
             self.last_cmd[1] = np.zeros(self.env_info['robot']['n_joints'])
-        return self.last_cmd
+        biem = self.last_cmd.flatten()
+        return biem
+        #return self.last_cmd
 
     def _plan_trajectory_thread(self):
         while not self.restart:
@@ -284,18 +286,22 @@ class HittingAgent(AgentBase):
 def main():
     from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
     plot_trajectory = False
-    env = AirHockeyChallengeWrapper(env="7dof-hit", interpolation_order=3, debug=plot_trajectory)
+    env = AirHockeyChallengeWrapper(env="3dof-hit", interpolation_order=3, debug=plot_trajectory)
 
     agent = HittingAgent(env.base_env.env_info)
 
     obs = env.reset()
     agent.reset()
-
+    print(f'obs in reset {obs}')
     steps = 0
     while True:
         steps += 1
         action = agent.draw_action(obs)
+        print(f'action in while {action}')
+
         obs, reward, done, info = env.step(action)
+        print(f'obs in while {action}')
+
         env.render()
 
         if done or steps > env.info.horizon:

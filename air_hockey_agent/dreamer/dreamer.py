@@ -3,13 +3,37 @@ import functools
 import os
 import pathlib
 import sys
+
+#os.environ["MUJOCO_GL"] = "osmesa"
+
 import numpy as np
-import yaml as yaml
+import ruamel.yaml as yaml
+
+ROOT_DIR = str(pathlib.Path(__file__).parent)
+ROOT_DIR = os.path.abspath(os.path.dirname(__file__))  # Get the script’s root folder
+
+print(ROOT_DIR)
+
+
+sys.path.append(str(pathlib.Path(__file__).parent))
 import exploration as expl
 import models
 import tools
 import envs.wrappers as wrappers
-from parallel import Parallel, Damy
+from parallel import Parallel, Damy 
+
+import threading
+import time
+
+import numpy as np
+from scipy.interpolate import CubicSpline
+
+#from air_hockey_challenge.framework.agent_base import AgentBase
+#from air_hockey_challenge.utils import inverse_kinematics, world_to_robot
+from baseline.baseline_agent import BezierPlanner, TrajectoryOptimizer, PuckTracker
+from air_hockey_agent.dreamer.airhockey_dreamer_agent import DreamerV3HittingAgent, DummyAgent
+from air_hockey_agent.dreamer.reward import Reward
+
 import torch
 from torch import nn
 from torch import distributions as torch
@@ -49,6 +73,8 @@ class Dreamer(nn.Module):
             plan2explore=lambda: expl.Plan2Explore(config, self._wm, reward),
         )[config.expl_behavior]().to(self._config.device)
 
+        self.last_action = None
+
     def __call__(self, obs, reset, state=None, training=True):
         step = self._step
         if training:
@@ -82,30 +108,41 @@ class Dreamer(nn.Module):
             latent = action = None
         else:
             latent, action = state
+
         obs = self._wm.preprocess(obs)
         embed = self._wm.encoder(obs)
+        
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
+
         if self._config.eval_state_mean:
             latent["stoch"] = latent["mean"]
         feat = self._wm.dynamics.get_feat(latent)
+
         if not training:
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
+            #print(f"Actor distribution parameters (not training): {actor}")
+
         elif self._should_expl(self._step):
             actor = self._expl_behavior.actor(feat)
             action = actor.sample()
         else:
             actor = self._task_behavior.actor(feat)
             action = actor.sample()
+        
+
         logprob = actor.log_prob(action)
         latent = {k: v.detach() for k, v in latent.items()}
         action = action.detach()
+
         if self._config.actor["dist"] == "onehot_gumble":
             action = torch.one_hot(
                 torch.argmax(action, dim=-1), self._config.num_actions
             )
+        #action = action.reshape(2, 3)
         policy_output = {"action": action, "logprob": logprob}
         state = (latent, action)
+        self.last_action = action
         return policy_output, state
 
     def _train(self, data):
@@ -147,6 +184,38 @@ def make_env(config, mode, id):
             config.size,
             seed=config.seed + id
         )
+        env = wrappers.OneHotAction(env)
+    elif suite == "memorymaze":
+        from envs.memorymaze import MemoryMaze
+
+        env = MemoryMaze(task, seed=config.seed + id)
+        env = wrappers.OneHotAction(env)
+    elif suite == "crafter":
+        import envs.crafter as crafter
+
+        env = crafter.Crafter(task, config.size, seed=config.seed + id)
+        env = wrappers.OneHotAction(env)
+    elif suite == "minecraft":
+        import envs.minecraft as minecraft
+
+        env = minecraft.make_env(task, size=config.size, break_speed=config.break_speed)
+        env = wrappers.OneHotAction(env)
+    elif suite == "airhockey":
+        #from air_hockey_challenge.framework.air_hockey_challenge_wrapper import AirHockeyChallengeWrapper
+        from air_hockey_agent.air_hockey_challenge_dreamer_wrapper import AirHockeyChallengeDreamerWrapper
+        reward = Reward()
+        env = AirHockeyChallengeDreamerWrapper(env="3dof-hit", custom_reward_function=reward.custom_reward, interpolation_order=3, debug=False)
+        agent = DreamerV3HittingAgent(env.base_env.env_info)
+        reward.setAgent(agent)
+        env.agent = agent
+        env = wrappers.NormalizeActions(env)
+
+        #obs = env.reset()
+        #print("Observation space:", env.observation_space)
+        #print("Action space:", env.action_space)
+
+        #env = wrappers.NormalizeActions(env)
+        print("JippieJaJee")
     else:
         raise NotImplementedError(suite)
     env = wrappers.TimeLimit(env, config.time_limit)
@@ -198,9 +267,8 @@ def main(config):
         train_envs = [Damy(env) for env in train_envs]
         eval_envs = [Damy(env) for env in eval_envs]
     acts = train_envs[0].action_space
-    print("Action Space", acts)
     config.num_actions = acts.n if hasattr(acts, "n") else acts.shape[0]
-
+    config.num_actions = 6
     state = None
     if not config.offline_traindir:
         prefill = max(0, config.prefill - count_steps(config.traindir))
@@ -252,6 +320,8 @@ def main(config):
         tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
         agent._should_pretrain._once = False
 
+    print("Action space (prefill):", train_envs[0].action_space)
+    print("Action space (eval):", eval_envs[0].action_space)
     # make sure eval will be executed once after config.steps
     while agent._step < config.steps + config.eval_every:
         logger.write()
@@ -297,10 +367,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", nargs="+")
     args, remaining = parser.parse_known_args()
+    yamlObject = yaml.YAML(typ='safe', pure=True)
+    configs = yamlObject.load((pathlib.Path(sys.argv[0]).parent / "configs.yaml").read_text())
+    """
     configs = yaml.safe_load(
         (pathlib.Path(sys.argv[0]).parent / "configs.yaml").read_text()
     )
-
+    """
     def recursive_update(base, update):
         for key, value in update.items():
             if isinstance(value, dict) and key in base:

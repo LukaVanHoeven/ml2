@@ -7,6 +7,7 @@ import pathlib
 import re
 import time
 import random
+import json
 
 import numpy as np
 
@@ -15,7 +16,6 @@ from torch import nn
 from torch.nn import functional as F
 from torch import distributions as torchd
 from torch.utils.tensorboard import SummaryWriter
-
 
 to_np = lambda x: x.detach().cpu().numpy()
 
@@ -90,13 +90,6 @@ class Logger:
                 self._writer.add_scalar(name, value, step)
         for name, value in self._images.items():
             self._writer.add_image(name, value, step)
-        for name, value in self._videos.items():
-            name = name if isinstance(name, str) else name.decode("utf-8")
-            if np.issubdtype(value.dtype, np.floating):
-                value = np.clip(255 * value, 0, 255).astype(np.uint8)
-            B, T, H, W, C = value.shape
-            value = value.transpose(1, 4, 2, 0, 3).reshape((1, T, C, H, B * W))
-            self._writer.add_video(name, value, step, 16)
 
         self._writer.flush()
         self._scalars = {}
@@ -136,6 +129,8 @@ def simulate(
     steps=0,
     episodes=0,
     state=None,
+    zeta=0.3,  # New parameter for connectivity update
+    topology_change_period=1000,  # Period for updating connectivity
 ):
     # initialize or unpack simulation state
     if state is None:
@@ -165,12 +160,23 @@ def simulate(
                 obs[index] = result
         # step agents
         obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
+        #print(f'obs: {obs}')
+
         action, agent_state = agent(obs, done, agent_state)
+        #print(f'action: {action}')
+
         if isinstance(action, dict):
             action = [
                 {k: np.array(action[k][i].detach().cpu()) for k in action}
                 for i in range(len(envs))
             ]
+            """
+            action = [
+                {k: np.array(v.detach().cpu()) if isinstance(v, torch.Tensor) else v
+                for k, v in action.items()}
+                for _ in range(len(envs))
+            ]
+            """
         else:
             action = np.array(action)
         assert len(action) == len(envs)
@@ -185,6 +191,9 @@ def simulate(
         length += 1
         step += len(envs)
         length *= 1 - done
+
+        if steps % 1000 == 0 and is_eval == False:
+            pass
         # add to cache
         for a, result, env in zip(action, results, envs):
             o, r, d, info = result
@@ -205,7 +214,9 @@ def simulate(
                 save_episodes(directory, {envs[i].id: cache[envs[i].id]})
                 length = len(cache[envs[i].id]["reward"]) - 1
                 score = float(np.array(cache[envs[i].id]["reward"]).sum())
-                video = cache[envs[i].id]["image"]
+                newCache = tuple(cache.items())
+                
+                video = None #video = cache[envs[i].id]["image"]
                 # record logs given from environments
                 for key in list(cache[envs[i].id].keys()):
                     if "log_" in key:

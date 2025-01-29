@@ -6,21 +6,20 @@ defaults:
   offline_evaldir: ""
   seed: 0
   deterministic_run: False
-  steps: 1e6
+  steps: 5000 #1e4
   parallel: False
-  eval_every: 1e4
-  eval_episode_num: 10
-  log_every: 1e4
+  eval_every: 1024 #1e2
+  eval_episode_num: 10 #10
+  log_every: 1e4 #1e2
   reset_every: 0
-  device: "cuda:0"
+
+  device: 'cpu' #change back to "cuda:0" when on gpu
   compile: True
   precision: 32
-  debug: False
-  video_pred_log: True
+  debug: True #False
+  video_pred_log: False #True
 
-  # Environment
-  task: "dmc_walker_walk"
-  size: [64, 64]
+  task: 'airhockey_hit'
   envs: 1
   action_repeat: 2
   time_limit: 1000
@@ -42,34 +41,9 @@ defaults:
   act: "SiLU"
   norm: True
   encoder:
-    {
-      mlp_keys: "$^",
-      cnn_keys: "image",
-      act: "SiLU",
-      norm: True,
-      cnn_depth: 32,
-      kernel_size: 4,
-      minres: 4,
-      mlp_layers: 5,
-      mlp_units: 1024,
-      symlog_inputs: True,
-    }
+    {mlp_keys: '$^', cnn_keys: '$^', act: 'SiLU', norm: True, cnn_depth: 32, kernel_size: 4, minres: 4, mlp_layers: 5, mlp_units: 1024, symlog_inputs: True}
   decoder:
-    {
-      mlp_keys: "$^",
-      cnn_keys: "image",
-      act: "SiLU",
-      norm: True,
-      cnn_depth: 32,
-      kernel_size: 4,
-      minres: 4,
-      mlp_layers: 5,
-      mlp_units: 1024,
-      cnn_sigmoid: False,
-      image_dist: mse,
-      vector_dist: symlog_mse,
-      outscale: 1.0,
-    }
+    {mlp_keys: '$^', cnn_keys: '$^', act: 'SiLU', norm: True, cnn_depth: 32, kernel_size: 4, minres: 4, mlp_layers: 5, mlp_units: 1024, cnn_sigmoid: False, image_dist: mse, vector_dist: symlog_mse, outscale: 1.0}
   actor:
     {
       layers: 2,
@@ -108,21 +82,21 @@ defaults:
   initial: "learned"
 
   # Training
-  batch_size: 16
-  batch_length: 64
-  train_ratio: 512
-  pretrain: 100
+  batch_size: 8 #16
+  batch_length: 16 #64
+  train_ratio: 64 #512
+  pretrain: 1 #100
   model_lr: 1e-4
   opt_eps: 1e-8
-  grad_clip: 1000
-  dataset_size: 1000000
-  opt: "adam"
+  grad_clip: 100 #1000
+  dataset_size: 1000 #1000000
+  opt: 'adam'
 
   # Behavior.
   discount: 0.997
   discount_lambda: 0.95
-  imag_horizon: 15
-  imag_gradient: "dynamics"
+  imag_horizon: 5 #15
+  imag_gradient: 'dynamics'
   imag_gradient_mix: 0.0
   eval_state_mean: False
 
@@ -153,19 +127,46 @@ air_hockey:
   batch_length: 50,
   train_steps: 1000000,
 
-  # Model architecture
-  deter_size: 200,
-  stoch_size: 30,
-  num_units: 400,
+dmc_walker:
+  task: 'dmc_walker_walk'
+  size: [64, 64]
+  envs: 1
+  action_repeat: 2
+  time_limit: 1000
+  grayscale: False
+  prefill: 2500
+  reward_EMA: True
 
-  # Learning rates
-  model_lr: 3e-4,
-  actor_lr: 8e-5,
-  critic_lr: 8e-5,
+airhockey:
+  task: 'airhockey_hit'
+  #size: [64, 64]
+  encoder: {mlp_keys: '.*', cnn_keys: '$^', act: 'ReLU', norm: True, mlp_layers: 2, mlp_units: 32}
+  decoder: {mlp_keys: '.*', cnn_keys: '$^', act: 'ReLU', norm: True, mlp_layers: 2, mlp_units: 32}
+  envs: 1
+  action_repeat: 2
+  video_pred_log: False
+  time_limit: 20 #1000
+  grayscale: False
+  prefill: 20 #2500
+  reward_EMA: True
 
-  # Other parameters
-  expl_amount: 0.3,
-  discount: 0.99,
+crafter:
+  task: crafter_reward
+  step: 1e6
+  action_repeat: 1
+  envs: 1
+  train_ratio: 512
+  video_pred_log: true
+  dyn_hidden: 1024
+  dyn_deter: 4096
+  units: 1024
+  encoder: {mlp_keys: '$^', cnn_keys: 'image', cnn_depth: 96, mlp_layers: 5, mlp_units: 1024}
+  decoder: {mlp_keys: '$^', cnn_keys: 'image', cnn_depth: 96, mlp_layers: 5, mlp_units: 1024}
+  actor: {layers: 5, dist: 'onehot', std: 'none'}
+  value: {layers: 5}
+  reward_head: {layers: 5}
+  cont_head: {layers: 5}
+  imag_gradient: 'reinforce'
 
 atari100k:
   steps: 4e5
