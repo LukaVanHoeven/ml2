@@ -17,9 +17,6 @@ from torch.nn import functional as F
 from torch import distributions as torchd
 from torch.utils.tensorboard import SummaryWriter
 
-#
-
-
 to_np = lambda x: x.detach().cpu().numpy()
 
 
@@ -93,15 +90,7 @@ class Logger:
                 self._writer.add_scalar(name, value, step)
         for name, value in self._images.items():
             self._writer.add_image(name, value, step)
-        """
-        for name, value in self._videos.items():
-            name = name if isinstance(name, str) else name.decode("utf-8")
-            if np.issubdtype(value.dtype, np.floating):
-                value = np.clip(255 * value, 0, 255).astype(np.uint8)
-            B, T, H, W, C = value.shape
-            value = value.transpose(1, 4, 2, 0, 3).reshape((1, T, C, H, B * W))
-            self._writer.add_video(name, value, step, 16)
-        """
+
         self._writer.flush()
         self._scalars = {}
         self._images = {}
@@ -175,6 +164,7 @@ def simulate(
 
         action, agent_state = agent(obs, done, agent_state)
         #print(f'action: {action}')
+
         if isinstance(action, dict):
             action = [
                 {k: np.array(action[k][i].detach().cpu()) for k in action}
@@ -227,7 +217,6 @@ def simulate(
                 newCache = tuple(cache.items())
                 
                 video = None #video = cache[envs[i].id]["image"]
-
                 # record logs given from environments
                 for key in list(cache[envs[i].id].keys()):
                     if "log_" in key:
